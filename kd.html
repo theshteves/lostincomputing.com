@@ -1,0 +1,274 @@
+<!doctype html>
+<html>
+  <head>
+	<style>
+html, body, #canvas {
+  background: #000;
+  color: #555;
+  font-family: helvetica;
+  height: 100%;
+  width: 100%;
+  margin: 0 auto;
+  display: block;
+}
+/*   box-shadow: 0 0 3px #555 */
+button {
+  background: transparent;
+  border: 1px solid #555;
+  color: #fff;
+  border-radius: 5px;
+  padding: 10px;
+  outline: 0;
+}
+button:active {
+  background: #333;
+}
+button:hover {
+  border-color: #aaa;
+}
+label {
+  display: inline-block;
+  width: 90px;
+  text-align: right;
+  padding: 0 5px 0 0;
+}
+input {
+  display: inline-block;
+  border: 1px solid #555;
+  background: #000;
+  color: #fff;
+  border-radius: 3px;
+  padding: 3px 10px;
+}
+.wrap {
+  text-align: right;
+}
+.wrap button {
+  padding: 5px 10px;
+}
+br {
+  clear: both;
+}
+hr {
+  clear: both;
+  border: 1px solid #555;
+  border-top: none;
+}
+	</style>
+
+<script src="https://code.jquery.com/jquery-3.7.1.min.js" integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=" crossorigin="anonymous"></script>
+    <script src="./kd.min.js" type="text/javascript"></script>
+
+	<script defer type="text/javascript">
+$(function () {
+  var tree = new kdTree([], distance, ["x", "y"]);
+  var canvas = $("#canvas")[0];
+  var ctx = canvas.getContext("2d");
+  var points = [];
+  var cX = canvas.width,
+    cY = canvas.height;
+
+  var opts = {};
+  opts.fillColor = "rgba(0,0,0,0)";
+  opts.lineColor = "#ffbf00";
+  opts.lineWidth = .1;
+  opts.colorShift = false;
+
+  var drawInterval, colorInterval;
+
+  $("#lineWidth").val(opts.lineWidth);
+  $("#lineColor").val(opts.lineColor);
+  $("#fillColor").val(opts.fillColor);
+
+  function distance(a, b) {
+    var dx = a.x - b.x;
+    var dy = a.y - b.y;
+    return dx * dx + dy * dy;
+  }
+
+  function clear() {
+    ctx.clearRect(0, 0, cX, cY);
+  }
+
+  //---------- draw code
+
+  function renderTree() {
+    clear();
+    render(tree.root, [
+      [0, cX],
+      [0, cY]
+    ]);
+    //$("#factor").text(tree.balanceFactor());
+
+    function render(node, bounds) {
+      if (node === null) return;
+
+      /*      ctx.beginPath();
+        ctx.fillStyle = "rgba(255,255,55,0.5)";
+        ctx.lineWidth = '0.3'
+        ctx.beginPath();
+        ctx.arc(node.obj.x, node.obj.y, 2, 0, Math.PI*2);
+        ctx.closePath();*/
+      //ctx.fill();
+
+      var leftBounds = [];
+      leftBounds[0] = bounds[0].slice(0);
+      leftBounds[1] = bounds[1].slice(0);
+
+      var rightBounds = [];
+      rightBounds[0] = bounds[0].slice(0);
+      rightBounds[1] = bounds[1].slice(0);
+
+      ctx.strokeStyle = opts.lineColor;
+      ctx.lineWidth = opts.lineWidth;
+
+      ctx.beginPath();
+      if (node.dimension === 0) {
+        // was split on x value
+        ctx.moveTo(node.obj.x, bounds[1][0]);
+        ctx.lineTo(node.obj.x, bounds[1][1]);
+        leftBounds[0][1] = node.obj.x;
+        rightBounds[0][0] = node.obj.x;
+      } else {
+        ctx.moveTo(bounds[0][0], node.obj.y);
+        ctx.lineTo(bounds[0][1], node.obj.y);
+        leftBounds[1][1] = node.obj.y;
+        rightBounds[1][0] = node.obj.y;
+      }
+      ctx.closePath();
+      ctx.stroke();
+
+      ctx.fillStyle = opts.fillColor;
+      ctx.fillRect(
+        bounds[0][0],
+        bounds[1][0],
+        bounds[0][1] - bounds[0][0],
+        bounds[1][1] - bounds[1][0]
+      );
+
+      render(node.left, leftBounds);
+      render(node.right, rightBounds);
+    }
+  }
+
+  //---------- automata
+
+  function go() {
+    drawInterval = setInterval(function () {
+      window.requestAnimationFrame(function () {
+        var point = {
+          x: Math.random() * cX,
+          y: Math.random() * cY
+        };
+        points.push(point);
+        tree.insert(point);
+        //TODO: instead of render tree, try just rendering nodes
+        renderTree();
+      });
+    }, 10);
+
+    var num1 = 0,
+      num2 = 0,
+      num3 = 0,
+      sum;
+
+    function getRandomArbitrary(min, max) {
+      return Math.random() * (max - min) + min;
+    }
+
+    colorInterval = setInterval(function () {
+      if (opts.colorShift) {
+        var roll = function roll() {
+          num1 = Math.floor(getRandomArbitrary(40, 255));
+          num2 = Math.floor(getRandomArbitrary(40, 255));
+          num3 = Math.floor(getRandomArbitrary(40, 255));
+          sum = num1 + num2 + num3;
+        };
+        roll();
+        //RGBA suuuuuucks, I want HSL
+        if (sum < 400 || sum > 600) {
+          roll();
+        } else {
+          opts.lineColor = "rgba(" + num1 + "," + num2 + "," + num3 + ",1)";
+        }
+      } else {
+        $("#colorShift").css(
+          "color",
+          "#" + Math.floor(Math.random() * 16777215).toString(16)
+        );
+      }
+      renderTree();
+    }, 200);
+
+    //window.setInterval(function(){
+    //  tree = new kdTree(points, distance, ["x", "y"]);
+    //},600)
+  }
+  go();
+
+  //-------- control methods
+
+  function stop() {
+    window.clearInterval(drawInterval);
+    window.clearInterval(colorInterval);
+  }
+
+  function start() {
+    go();
+  }
+
+  //----------event actions
+  $(".wrap button").on("click", function (e) {
+    console.log($(e.target).parent().find("input"));
+    var input = $(e.target).parents(".wrap").find("input");
+    var prop = input.data("prop");
+    var val = input.val();
+    //yeah, I know.
+    opts[prop] = val;
+    console.log(prop, val);
+  });
+
+  $("#points").on("click", function () {
+    $("#pointsWrap").show().html(points);
+  });
+
+  $("#start").on("click", function () {
+    start();
+  });
+
+  $("#stop").on("click", function () {
+    stop();
+  });
+
+  $("#clear").on("click", function () {
+    clear();
+    tree = new kdTree([], 0, ["x", "y"]);
+  });
+
+  $("#rebuild").on("click", function () {
+    tree = new kdTree(points, distance, ["x", "y"]);
+    renderTree();
+  });
+
+  $("#colorShift").on("click", function () {
+    opts.colorShift = !opts.colorShift;
+  });
+
+  $("#canvas").on("click", function (e) {
+    var offset = $(e.target).offset(),
+      offsetX = e.offsetX || e.clientX - offset.left,
+      offsetY = e.offsetY || e.clientY - offset.top;
+
+    var point = tree.nearest({ x: offsetX, y: offsetY }, 1)[0][0];
+    points.splice(points.indexOf(point), 1);
+    tree.remove(point);
+    renderTree();
+  });
+});
+
+	</script>
+  </head>
+
+  <body>
+    <canvas id="canvas"></canvas>
+	</body></html>
